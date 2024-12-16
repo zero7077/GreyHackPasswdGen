@@ -1,0 +1,194 @@
+// Password Generator and Manager for Grey Hack
+// This script generates, stores, retrieves, and deletes passwords securely
+
+// Include necessary libraries
+crypto = include_lib("/lib/crypto.so")
+if not crypto then
+    print("<color=#ff0000>Error: Missing crypto library. Make sure /lib/crypto.so exists.</color>")
+    exit
+end if
+
+// Global Variables
+PASSWORD_FILE = home_dir + "/passwords.txt"
+
+// Function to generate a strong password
+generate_password = function(length)
+    if length < 8 then
+        print("<color=#ff0000>Error: Password length must be at least 8 characters.</color>")
+        return null
+    end if
+    
+    chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+<>?"
+    password = ""
+    
+    for i in range(1, length)
+        random_index = floor(rnd * chars.len)
+        password = password + chars[random_index]
+    end for
+    
+    return password
+end function
+
+// Function to save a password to the password file
+save_password = function(service, username, password)
+    if password == null or service == "" or username == "" then
+        print("<color=#ff0000>Error: Missing required data to save password.</color>")
+        return
+    end if
+    
+    comp = get_shell.host_computer
+    pass_file = comp.File(PASSWORD_FILE)
+    
+    if not pass_file then
+        comp.touch(home_dir, "passwords.txt")
+        pass_file = comp.File(PASSWORD_FILE)
+    end if
+    
+    encrypted_password = crypto.md5(password)
+    entry = service + ":" + username + ":" + encrypted_password + "\n"
+    
+    if pass_file.has_permission("w") then
+        current_content = pass_file.content
+        pass_file.set_content(current_content + entry)
+        print("<color=#00ff00>Success: Password saved for " + service + ".</color>")
+    else
+        print("<color=#ff0000>Error: No write permissions for " + PASSWORD_FILE + ".</color>")
+    end if
+end function
+
+// Function to retrieve a password for a specific service
+retrieve_password = function(service)
+    comp = get_shell.host_computer
+    pass_file = comp.File(PASSWORD_FILE)
+    
+    if not pass_file then
+        print("<color=#ff0000>Error: No password file found at " + PASSWORD_FILE + ".</color>")
+        return
+    end if
+    
+    if not pass_file.has_permission("r") then
+        print("<color=#ff0000>Error: No read permissions for " + PASSWORD_FILE + ".</color>")
+        return
+    end if
+    
+    content = pass_file.content
+    entries = content.split("\n")
+    
+    for entry in entries
+        if entry.indexOf(service) == 0 then
+            details = entry.split(":")
+            if details.len == 3 then
+                print("<color=#00ff00>Service: " + details[0] + "</color>")
+                print("<color=#00ff00>Username: " + details[1] + "</color>")
+                print("<color=#00ff00>Encrypted Password: " + details[2] + "</color>")
+                return
+            end if
+        end if
+    end for
+    
+    print("<color=#ff0000>Error: No password found for " + service + ".</color>")
+end function
+
+// Function to delete a password for a specific service
+delete_password = function(service)
+    comp = get_shell.host_computer
+    pass_file = comp.File(PASSWORD_FILE)
+    
+    if not pass_file then
+        print("<color=#ff0000>Error: No password file found at " + PASSWORD_FILE + ".</color>")
+        return
+    end if
+    
+    if not pass_file.has_permission("w") then
+        print("<color=#ff0000>Error: No write permissions for " + PASSWORD_FILE + ".</color>")
+        return
+    end if
+    
+    content = pass_file.content
+    entries = content.split("\n")
+    new_content = ""
+    
+    for entry in entries
+        if entry.indexOf(service) != 0 then
+            new_content = new_content + entry + "\n"
+        end if
+    end for
+    
+    pass_file.set_content(new_content)
+    print("<color=#00ff00>Success: Deleted password for " + service + ".</color>")
+end function
+
+// Function to list all services with saved passwords
+list_services = function()
+    comp = get_shell.host_computer
+    pass_file = comp.File(PASSWORD_FILE)
+    
+    if not pass_file then
+        print("<color=#ff0000>Error: No password file found at " + PASSWORD_FILE + ".</color>")
+        return
+    end if
+    
+    if not pass_file.has_permission("r") then
+        print("<color=#ff0000>Error: No read permissions for " + PASSWORD_FILE + ".</color>")
+        return
+    end if
+    
+    content = pass_file.content
+    entries = content.split("\n")
+    
+    print("<color=#00ff00>Services with saved passwords:</color>")
+    for entry in entries
+        if entry != "" then
+            service_name = entry.split(":")[0]
+            print("- " + service_name)
+        end if
+    end for
+end function
+
+// Main program logic
+while true
+    clear_screen
+    print("<b>Grey Hack Password Manager</b>")
+    print("[1] Generate a new password")
+    print("[2] Save a password")
+    print("[3] Retrieve a password")
+    print("[4] Delete a password")
+    print("[5] List all saved services")
+    print("[6] Exit")
+    choice = user_input("Select an option (1-6):")
+    
+    if choice == "1" then
+        length = user_input("Enter the password length (minimum 8):").to_int
+        if length < 8 then
+            print("<color=#ff0000>Error: Password length must be at least 8 characters.</color>")
+        else
+            password = generate_password(length)
+            if password != null then
+                print("<color=#00ff00>Generated Password: " + password + "</color>")
+            end if
+        end if
+        wait(3)
+    elseif choice == "2" 
+        service = user_input("Enter the service name:")
+        username = user_input("Enter the username:")
+        password = user_input("Enter the password to save:", 1)
+        save_password(service, username, password)
+        wait(3)
+    elseif choice == "3" 
+        service = user_input("Enter the service name to retrieve:")
+        retrieve_password(service)
+        wait(5)
+    elseif choice == "4" 
+        service = user_input("Enter the service name to delete:")
+        delete_password(service)
+        wait(3)
+    elseif choice == "5" 
+        list_services()
+        wait(5)
+    elseif choice == "6" 
+        exit("<color=#00ff00>Goodbye!</color>")
+    else
+        print("<color=#ff0000>Invalid option. Please select 1-6.</color>")
+        wait(2)
+    end if
+end while
